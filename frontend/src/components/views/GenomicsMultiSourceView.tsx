@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { useEditionTheme } from "@/hooks/useEditionTheme";
+import type { EditionTheme } from "@/lib/agent-editions";
 import { DiseaseIcon } from "@/components/IconFont";
 import { interpretGenomicsWithLlm } from "@/lib/genomics-api";
 import {
@@ -46,6 +48,7 @@ function TierBadge({ tier }: { tier?: string }) {
 }
 
 export function GenomicsMultiSourceView() {
+  const theme = useEditionTheme();
   const [cases, setCases] = useState<GenomicsCase[]>([DEMO_GENOMICS_CASE()]);
   const [activeId, setActiveId] = useState(cases[0]?.id ?? "");
   const [interpretation, setInterpretation] = useState<GenomicsInterpretation | null>(null);
@@ -148,7 +151,7 @@ export function GenomicsMultiSourceView() {
           <p className="text-xs font-semibold text-slate-500">基因组病例</p>
           <button
             onClick={loadDemo}
-            className="mt-2 w-full rounded-lg bg-gradient-to-r from-rose-500 to-violet-600 py-2 text-xs font-medium text-white hover:opacity-90"
+            className={`mt-2 w-full rounded-lg py-2 text-xs font-medium text-white hover:opacity-90 ${theme.btnPrimaryClass}`}
           >
             加载演示病例
           </button>
@@ -160,7 +163,7 @@ export function GenomicsMultiSourceView() {
               setInterpretation(null);
               setError(null);
             }}
-            className="mt-2 w-full rounded-lg border border-dashed border-rose-200 py-2 text-xs text-rose-600 hover:bg-rose-50"
+            className={`mt-2 w-full rounded-lg border border-dashed py-2 text-xs ${theme.linkDashedClass}`}
           >
             + 新建病例
           </button>
@@ -174,8 +177,7 @@ export function GenomicsMultiSourceView() {
                   setInterpretation(null);
                 }}
                 className={`mb-1 w-full rounded-lg px-3 py-2.5 text-left text-xs ${
-                  c.id === activeId
-                    ? "bg-rose-50 font-medium text-rose-700 ring-1 ring-rose-200"
+                  c.id === activeId ? theme.selectedItemClass
                     : "text-slate-600 hover:bg-slate-50"
                 }`}
               >
@@ -192,7 +194,7 @@ export function GenomicsMultiSourceView() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-5 py-3">
-          <DiseaseIcon name="ovarian" size={22} color="#7c3aed" />
+          <DiseaseIcon name="ovarian" size={22} color={theme.iconColor} />
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold text-slate-900">基因组多源数据</h2>
             <p className="text-xs text-slate-500">
@@ -202,7 +204,7 @@ export function GenomicsMultiSourceView() {
           <button
             onClick={handleInterpret}
             disabled={analyzing || linkedSources.length === 0}
-            className="rounded-lg bg-gradient-to-r from-rose-500 to-violet-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-50"
+            className={`rounded-lg px-4 py-2 text-xs font-medium text-white disabled:opacity-50 ${theme.btnPrimaryClass}`}
           >
             {analyzing ? "AI 融合解读中…" : "运行 AI 融合解读"}
           </button>
@@ -219,11 +221,11 @@ export function GenomicsMultiSourceView() {
             <div className="border-b border-slate-200 bg-white p-4">
               <p className="text-xs font-semibold text-slate-700">病例信息</p>
               <div className="mt-2 space-y-2">
-                <Field label="病例 ID" value={activeCase.patientId} onChange={(v) => updateCase({ patientId: v })} />
-                <Field label="FIGO" value={activeCase.figoStage} onChange={(v) => updateCase({ figoStage: v })} />
+                <Field theme={theme} label="病例 ID" value={activeCase.patientId} onChange={(v) => updateCase({ patientId: v })} />
+                <Field theme={theme} label="FIGO" value={activeCase.figoStage} onChange={(v) => updateCase({ figoStage: v })} />
                 <div className="grid grid-cols-2 gap-2">
-                  <Field label="HRD 评分" value={String(activeCase.hrdScore ?? "")} onChange={(v) => updateCase({ hrdScore: v ? Number(v) : undefined })} />
-                  <Field label="TMB" value={String(activeCase.tmb ?? "")} onChange={(v) => updateCase({ tmb: v ? Number(v) : undefined })} />
+                  <Field theme={theme} label="HRD 评分" value={String(activeCase.hrdScore ?? "")} onChange={(v) => updateCase({ hrdScore: v ? Number(v) : undefined })} />
+                  <Field theme={theme} label="TMB" value={String(activeCase.tmb ?? "")} onChange={(v) => updateCase({ tmb: v ? Number(v) : undefined })} />
                 </div>
               </div>
             </div>
@@ -233,7 +235,7 @@ export function GenomicsMultiSourceView() {
               <p className="mt-1 text-[11px] text-slate-400">点击切换关联状态（演示可模拟多源接入）</p>
               <div className="mt-3 space-y-2">
                 {activeCase.sources.map((s) => (
-                  <SourceCard key={s.id} source={s} onToggle={() => toggleSource(s.id)} />
+                  <SourceCard theme={theme} key={s.id} source={s} onToggle={() => toggleSource(s.id)} />
                 ))}
               </div>
             </div>
@@ -241,10 +243,10 @@ export function GenomicsMultiSourceView() {
 
           <div className="flex min-w-0 flex-1 flex-col overflow-y-auto scrollbar-thin bg-slate-50/50 p-5">
             <div className="mb-4 grid gap-3 sm:grid-cols-4">
-              <StatCard label="已关联数据源" value={`${linkedSources.length}/6`} />
-              <StatCard label="可靶向变异" value={String(activeCase.variants.filter((v) => v.tier === "I" || v.tier === "II").length)} accent />
-              <StatCard label="HRD" value={activeCase.hrdStatus === "positive" ? "阳性" : activeCase.hrdStatus ?? "—"} accent />
-              <StatCard label="多源冲突" value={String(activeCase.variants.filter((v) => v.conflict).length)} warn={activeCase.variants.some((v) => v.conflict)} />
+              <StatCard theme={theme} label="已关联数据源" value={`${linkedSources.length}/6`} />
+              <StatCard theme={theme} label="可靶向变异" value={String(activeCase.variants.filter((v) => v.tier === "I" || v.tier === "II").length)} accent />
+              <StatCard theme={theme} label="HRD" value={activeCase.hrdStatus === "positive" ? "阳性" : activeCase.hrdStatus ?? "—"} accent />
+              <StatCard theme={theme} label="多源冲突" value={String(activeCase.variants.filter((v) => v.conflict).length)} warn={activeCase.variants.some((v) => v.conflict)} />
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -285,7 +287,7 @@ export function GenomicsMultiSourceView() {
                         {activeCase.sources.map((s) => (
                           <td key={s.id} className="px-2 py-2.5 text-center">
                             {v.sources.includes(s.id) ? (
-                              <span className="inline-block h-2 w-2 rounded-full bg-rose-500" title="检出" />
+                              <span className={`inline-block h-2 w-2 rounded-full ${theme.accentSolidClass}`} title="检出" />
                             ) : (
                               <span className="inline-block h-2 w-2 rounded-full bg-slate-200" />
                             )}
@@ -294,7 +296,7 @@ export function GenomicsMultiSourceView() {
                         <td className="px-3 py-2.5 text-slate-600">
                           {v.clinicalSignificance}
                           {v.therapy && (
-                            <p className="mt-0.5 text-[10px] text-violet-600">{v.therapy}</p>
+                            <p className={`mt-0.5 text-[10px] ${theme.accentTextClass}`}>{v.therapy}</p>
                           )}
                         </td>
                       </tr>
@@ -309,8 +311,7 @@ export function GenomicsMultiSourceView() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
-                      interpretation.source === "llm"
-                        ? "bg-violet-100 text-violet-700"
+                      interpretation.source === "llm" ? theme.badgeClass
                         : "bg-slate-200 text-slate-600"
                     }`}
                   >
@@ -327,8 +328,7 @@ export function GenomicsMultiSourceView() {
 
                 <div
                   className={`rounded-xl border p-4 ${
-                    interpretation.parpEligible
-                      ? "border-rose-200 bg-gradient-to-r from-rose-50 to-violet-50"
+                    interpretation.parpEligible ? theme.highlightBoxClass
                       : "border-slate-200 bg-white"
                   }`}
                 >
@@ -342,9 +342,9 @@ export function GenomicsMultiSourceView() {
                 </div>
 
                 {interpretation.reasoning && (
-                  <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
-                    <p className="text-xs font-semibold text-violet-900">AI 融合推理</p>
-                    <p className="mt-2 text-sm leading-relaxed text-violet-950">{interpretation.reasoning}</p>
+                  <div className={`rounded-xl p-4 ${theme.aiPanelClass}`}>
+                    <p className={`text-xs font-semibold ${theme.aiPanelTitleClass}`}>AI 融合推理</p>
+                    <p className={`mt-2 text-sm leading-relaxed ${theme.aiPanelTextClass}`}>{interpretation.reasoning}</p>
                   </div>
                 )}
 
@@ -353,7 +353,7 @@ export function GenomicsMultiSourceView() {
                   <ul className="mt-2 space-y-1.5">
                     {interpretation.recommendations.map((r) => (
                       <li key={r} className="flex gap-2 text-xs text-slate-700">
-                        <span className="text-rose-500">•</span>
+                        <span className={theme.listBulletClass}>•</span>
                         {r}
                       </li>
                     ))}
@@ -394,7 +394,7 @@ export function GenomicsMultiSourceView() {
                   {analyzing ? "大模型正在融合 6 源基因组数据…" : "关联数据源后，点击「运行 AI 融合解读」"}
                 </p>
                 {!analyzing && linkedSources.length === 0 && (
-                  <button onClick={loadDemo} className="mt-3 text-xs text-rose-600 hover:underline">
+                  <button onClick={loadDemo} className={`mt-3 text-xs hover:underline ${theme.linkClass}`}>
                     或加载演示病例
                   </button>
                 )}
@@ -408,10 +408,12 @@ export function GenomicsMultiSourceView() {
 }
 
 function Field({
+  theme,
   label,
   value,
   onChange,
 }: {
+  theme: EditionTheme;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -422,19 +424,18 @@ function Field({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+        className={`w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 ${theme.inputFocusRingClass}`}
       />
     </label>
   );
 }
 
-function SourceCard({ source, onToggle }: { source: GenomicsSourceMeta; onToggle: () => void }) {
+function SourceCard({ theme, source, onToggle }: { theme: EditionTheme; source: GenomicsSourceMeta; onToggle: () => void }) {
   return (
     <button
       onClick={onToggle}
       className={`w-full rounded-xl border p-3 text-left transition ${
-        source.linked
-          ? "border-rose-200 bg-white ring-1 ring-rose-100"
+        source.linked ? theme.borderSelectedClass
           : "border-dashed border-slate-200 bg-slate-50 opacity-70"
       }`}
     >
@@ -455,11 +456,13 @@ function SourceCard({ source, onToggle }: { source: GenomicsSourceMeta; onToggle
 }
 
 function StatCard({
+  theme,
   label,
   value,
   accent,
   warn,
 }: {
+  theme: EditionTheme;
   label: string;
   value: string;
   accent?: boolean;
@@ -471,7 +474,7 @@ function StatCard({
         warn ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"
       }`}
     >
-      <p className={`text-xl font-bold ${accent ? "text-rose-600" : "text-slate-800"}`}>{value}</p>
+      <p className={`text-xl font-bold ${accent ? theme.accentTextClass : "text-slate-800"}`}>{value}</p>
       <p className="text-[10px] text-slate-500">{label}</p>
     </div>
   );

@@ -3,11 +3,13 @@
 import { useApp } from "@/context/AppContext";
 import { useRouter } from "next/navigation";
 import { DiseaseIcon, type DiseaseIconName } from "@/components/IconFont";
+import { useEditionTheme } from "@/hooks/useEditionTheme";
 
 /** 垂类知识库 — 妇科肿瘤亚专科 + 关键试验 */
 export function KnowledgeView() {
   const { config } = useApp();
   const router = useRouter();
+  const theme = useEditionTheme();
 
   if (!config) {
     return <div className="p-8 text-slate-400">加载知识库…</div>;
@@ -24,25 +26,18 @@ export function KnowledgeView() {
                 key={d.id}
                 className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
               >
-                <DiseaseIcon
-                  name={d.icon as DiseaseIconName}
-                  size={28}
-                  color="#e11d48"
-                />
+                <DiseaseIcon name={d.icon as DiseaseIconName} size={28} color={theme.iconColor} />
                 <p className="mt-3 font-semibold text-slate-900">{d.name}</p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {d.topics.map((t) => (
-                    <span
-                      key={t}
-                      className="rounded-md bg-rose-50 px-2 py-0.5 text-xs text-rose-700"
-                    >
+                    <span key={t} className={`rounded-md px-2 py-0.5 text-xs ${theme.chipClass}`}>
                       {t}
                     </span>
                   ))}
                 </div>
                 <button
                   onClick={() => router.push(`/?q=${encodeURIComponent(d.name)}`)}
-                  className="mt-4 text-xs font-medium text-rose-600 hover:underline"
+                  className={`mt-4 text-xs font-medium hover:underline ${theme.linkClass}`}
                 >
                   在科学导航中搜索 →
                 </button>
@@ -59,7 +54,7 @@ export function KnowledgeView() {
                 key={t.name}
                 className="flex items-start gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
               >
-                <span className="shrink-0 rounded-lg bg-violet-100 px-2.5 py-1 text-xs font-bold text-violet-700">
+                <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${theme.badgeClass}`}>
                   {t.name}
                 </span>
                 <div>

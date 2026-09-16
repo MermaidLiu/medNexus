@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.diagnosis import router as diagnosis_router
+from app.api.cohort import router as cohort_router
 from app.api.imaging import router as imaging_router
 from app.api.navigator import router as navigator_router
 from app.api.routes import router
@@ -23,6 +25,8 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(navigator_router)
 app.include_router(imaging_router)
+app.include_router(cohort_router)
+app.include_router(diagnosis_router)
 
 
 @app.get("/")

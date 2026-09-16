@@ -1,0 +1,14 @@
+{
+  "description": "MedNexus 临床诊断小程序",
+  "packOptions": { "ignore": [], "include": [] },
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "postcss": true,
+    "minified": true
+  },
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "mednexus-diagnosis",
+  "condition": {}
+}

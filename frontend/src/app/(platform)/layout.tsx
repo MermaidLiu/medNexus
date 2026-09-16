@@ -1,6 +1,7 @@
 "use client";
 
 import { AppProvider } from "@/context/AppContext";
+import { ResearchProvider } from "@/context/ResearchContext";
 import { AppShell } from "@/components/layout/AppShell";
 
 export default function PlatformLayout({
@@ -10,7 +11,9 @@ export default function PlatformLayout({
 }) {
   return (
     <AppProvider>
-      <AppShell>{children}</AppShell>
+      <ResearchProvider>
+        <AppShell>{children}</AppShell>
+      </ResearchProvider>
     </AppProvider>
   );
 }

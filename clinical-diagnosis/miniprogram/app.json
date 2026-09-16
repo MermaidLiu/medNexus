@@ -1,0 +1,14 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/visit/visit"
+  ],
+  "window": {
+    "navigationBarTitleText": "临床诊断 · AI 辅助",
+    "navigationBarBackgroundColor": "#e11d48",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f8fafc"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

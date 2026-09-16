@@ -1,0 +1,4 @@
+{
+  "desc": "MedNexus 临床诊断",
+  "rules": [{ "action": "allow", "page": "*" }]
+}

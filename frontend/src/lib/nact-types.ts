@@ -37,10 +37,23 @@ export interface NactMolecularData {
   hrdScore?: number;
 }
 
+export interface NactCohortRef {
+  id: string;
+  name?: string;
+  sourceRow?: number;
+  outcomes?: {
+    nact_response?: string;
+    r0?: string;
+    pfs?: string;
+    os?: string;
+  };
+}
+
 export interface NactCase {
   id: string;
   createdAt: string;
   status: NactCaseStatus;
+  cohortRef?: NactCohortRef;
   clinical: NactClinicalData;
   imaging: NactImagingLink;
   pathology: NactPathologyData;

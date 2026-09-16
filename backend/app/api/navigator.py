@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
+from app.config import settings
 from app.tools.navigator import get_navigator_config, navigator_search
 
 router = APIRouter(prefix="/api/v1/navigator", tags=["navigator"])
@@ -14,7 +15,11 @@ class NavigatorSearchRequest(BaseModel):
 
 @router.get("/config")
 async def config() -> dict:
-    return get_navigator_config()
+    cfg = get_navigator_config()
+    edition = settings.agent_edition.strip().lower()
+    if edition in ("research", "pharma"):
+        cfg["agentEdition"] = edition
+    return cfg
 
 
 @router.post("/search")

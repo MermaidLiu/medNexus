@@ -1,0 +1,9 @@
+<view class="page">
+  <view class="hero">
+    <text class="title">MedNexus 临床诊断</text>
+    <text class="sub">挂号 · 预问诊 · 检验 · 影像 · 指南 · AI</text>
+  </view>
+  <button class="btn primary" loading="{{loading}}" bindtap="startVisit">开始新就诊</button>
+  <button wx:if="{{visitId}}" class="btn" bindtap="continueVisit">继续上次就诊</button>
+  <text class="hint">与 Web 端共用后端，visitId 同步存储</text>
+</view>

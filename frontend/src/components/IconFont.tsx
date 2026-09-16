@@ -120,6 +120,14 @@ export function IconClinical(p: Props) {
   );
 }
 
+export function IconDiagnosis(p: Props) {
+  return (
+    <Svg {...p}>
+      <path d="M341.333 213.333c0-94.293 76.374-170.667 170.667-170.667S682.667 119.04 682.667 213.333c0 70.4-42.667 130.987-103.467 157.014L512 768l-67.2-397.653C383.467 344.32 341.333 283.733 341.333 213.333zM512 128c47.147 0 85.333 38.187 85.333 85.333S559.147 298.667 512 298.667 426.667 260.48 426.667 213.333 464.853 128 512 128zM256 725.333h512v85.334H256v-85.334z" />
+    </Svg>
+  );
+}
+
 export function IconUser(p: Props) {
   return (
     <Svg {...p}>
@@ -189,7 +197,8 @@ export type NavIconName =
   | "skill"
   | "scan"
   | "clinical"
-  | "genome";
+  | "genome"
+  | "diagnosis";
 
 const NAV_ICON_MAP: Record<NavIconName, ComponentType<Props>> = {
   compass: IconCompass,
@@ -204,6 +213,7 @@ const NAV_ICON_MAP: Record<NavIconName, ComponentType<Props>> = {
   scan: IconScan,
   clinical: IconClinical,
   genome: IconGenome,
+  diagnosis: IconDiagnosis,
 };
 
 export function NavIcon({ name, ...props }: Props & { name: NavIconName }) {

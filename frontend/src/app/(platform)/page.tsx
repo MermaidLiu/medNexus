@@ -1,5 +1,5 @@
-import { NavigatorView } from "@/components/views/NavigatorView";
+import { PlatformHomeView } from "@/components/views/PlatformHomeView";
 
 export default function HomePage() {
-  return <NavigatorView />;
+  return <PlatformHomeView />;
 }

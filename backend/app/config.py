@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     imaging_api_url: str = "http://42.81.102.195:8000"
     imaging_api_timeout: float = 600.0
 
+    # Agent 版本：research | pharma（科研平台，不含临床诊疗）
+    agent_edition: str = "research"
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

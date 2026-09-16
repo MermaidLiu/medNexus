@@ -16,11 +16,30 @@ build/
 backend/.env
 frontend/.env.local
 
+# Cohort data (PII — do not commit)
+data/cohort/*.xlsx
+data/cohort/*.xls
+data/cohort/*.zip
+data/cohort/*.json
+data/cohort/cohort_db.json
+
+# Clinical diagnosis visits (PII)
+data/diagnosis/
+clinical-diagnosis/data/diagnosis/
+clinical-diagnosis/data/diagnosis/*.json
+clinical-diagnosis/web/.next/
+clinical-diagnosis/web/node_modules
+clinical-diagnosis/web/node_modules/
+clinical-diagnosis/backend/.venv/
+clinical-diagnosis/web/.env.local
+clinical-diagnosis/backend/.env
+
 # IDE / OS
 .idea/
 .vscode/
 .DS_Store
 *.log
+*.tsbuildinfo
 
 # Python
 .venv/

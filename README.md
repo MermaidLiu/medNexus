@@ -40,6 +40,17 @@
 | `/apps` | Apps 工具库 |
 | `/knowledge` | 垂类知识库 |
 
+## 平台定位
+
+**本仓库大平台（frontend + backend）仅面向科研**，提供两个 Agent 版本：
+
+| 版本 | 首页 | 能力 |
+|------|------|------|
+| **科研版** | `/` 病例队列工作台 | 关联病例 → 单例病历 → 多选 → 多组学分析（ML / 影像 / 基因组）+ 读算做 |
+| **药企版** | `/` 研发管线 | 富集分层、标志物、靶点发现 + 多组学验证 |
+
+**临床诊疗（挂号、预问诊、医生端）** 已拆至独立项目 [`clinical-diagnosis/`](clinical-diagnosis/)，不在此平台展示。
+
 ## 快速启动
 
 ```bash
@@ -48,6 +59,14 @@ cd backend && uvicorn app.main:app --reload --port 8000
 
 # 前端
 cd frontend && bash scripts/install.sh && npm run dev
+# 打开 http://localhost:3000 ，左侧切换「科研版 / 药企版」
+```
+
+### 独立 MVP：AI 辅助临床诊断（院方）
+
+```bash
+cd clinical-diagnosis && bash scripts/dev.sh
+# http://localhost:3001/diagnosis
 ```
 
 ## API

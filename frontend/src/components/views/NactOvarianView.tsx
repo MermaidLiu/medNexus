@@ -2,8 +2,18 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEditionTheme } from "@/hooks/useEditionTheme";
+import type { EditionTheme } from "@/lib/agent-editions";
+import { CohortImportModal } from "@/components/cohort/CohortImportModal";
 import { DiseaseIcon } from "@/components/IconFont";
+import { fetchCohort, importCohortExcel } from "@/lib/cohort-api";
+import { loadCohortLocal, saveCohortLocal, type CohortPatient } from "@/lib/cohort-types";
 import { predictNactWithLlm } from "@/lib/nact-api";
+import {
+  cohortDisplayName,
+  cohortPatientToNactCase,
+  findCaseByCohortId,
+} from "@/lib/nact-cohort";
 import {
   createEmptyCase,
   DEFAULT_CLINICAL,
@@ -67,15 +77,79 @@ function ProbRing({ value, label, sub }: { value: number; label: string; sub: st
 }
 
 export function NactOvarianView() {
-  const [cases, setCases] = useState<NactCase[]>([DEMO_CASE()]);
-  const [activeId, setActiveId] = useState(cases[0]?.id ?? "");
+  const theme = useEditionTheme();
+  const inputRing = theme.inputFocusRingClass;
+  const [cases, setCases] = useState<NactCase[]>([]);
+  const [activeId, setActiveId] = useState("");
+  const [cohortPatients, setCohortPatients] = useState<CohortPatient[]>([]);
+  const [cohortSource, setCohortSource] = useState<string | null>(null);
+  const [cohortSearch, setCohortSearch] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
   const [tab, setTab] = useState<InputTab>("clinical");
   const [prediction, setPrediction] = useState<NactPrediction | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeStage, setAnalyzeStage] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const activeCase = cases.find((c) => c.id === activeId) ?? cases[0];
+  const activeCase = cases.find((c) => c.id === activeId);
+
+  const loadCohort = useCallback(async () => {
+    try {
+      const data = await fetchCohort();
+      setCohortPatients(data.patients ?? []);
+      setCohortSource(data.sourceFile ?? null);
+      saveCohortLocal(data);
+    } catch {
+      const local = loadCohortLocal();
+      if (local?.patients?.length) {
+        setCohortPatients(local.patients);
+        setCohortSource(local.sourceFile ?? null);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCohort();
+  }, [loadCohort]);
+
+  const handleCohortImport = async (file: File, mode: "replace" | "append") => {
+    const result = await importCohortExcel(file, mode);
+    setCohortPatients(result.patients);
+    setCohortSource(file.name);
+    saveCohortLocal({
+      patients: result.patients,
+      sourceFile: file.name,
+      importedAt: result.importedAt,
+      columns_mapped: result.columns_mapped,
+      columns_raw: result.columns_raw,
+      patient_count: result.total,
+    });
+    setImportOpen(false);
+    setError(null);
+  };
+
+  const openCohortForNact = (p: CohortPatient) => {
+    const existing = findCaseByCohortId(cases, p.id);
+    if (existing) {
+      setActiveId(existing.id);
+      setPrediction(null);
+      return;
+    }
+    const nactCase = cohortPatientToNactCase(p);
+    setCases((prev) => [nactCase, ...prev]);
+    setActiveId(nactCase.id);
+    setPrediction(null);
+    setError(null);
+  };
+
+  const filteredCohort = useMemo(() => {
+    const q = cohortSearch.trim().toLowerCase();
+    if (!q) return cohortPatients;
+    return cohortPatients.filter((p) => {
+      const blob = [p.patient_id, p.name, p.figo, p.nact_response].filter(Boolean).join(" ").toLowerCase();
+      return blob.includes(q);
+    });
+  }, [cohortPatients, cohortSearch]);
 
   const updateCase = useCallback((patch: Partial<NactCase>, keepPrediction = false) => {
     setCases((prev) =>
@@ -179,74 +253,74 @@ export function NactOvarianView() {
     return (((ca125Baseline - ca125Mid) / ca125Baseline) * 100).toFixed(0);
   }, [activeCase]);
 
-  if (!activeCase) return null;
+  if (!activeCase) {
+    return (
+      <div className="flex flex-1 min-h-0">
+        <CohortSidebar
+          theme={theme}
+          cohortPatients={cohortPatients}
+          cohortSource={cohortSource}
+          cohortSearch={cohortSearch}
+          setCohortSearch={setCohortSearch}
+          filteredCohort={filteredCohort}
+          activeCohortId={null}
+          onImport={() => setImportOpen(true)}
+          onSelectCohort={openCohortForNact}
+          onLoadDemo={loadDemoCase}
+        />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+          <p className="text-sm text-slate-600">从左侧 91 例队列选择病例，或导入 Excel 开始 NACT 预测</p>
+          <button
+            onClick={() => setImportOpen(true)}
+            className={`rounded-lg ${theme.btnPrimaryClass} px-5 py-2 text-xs font-medium text-white`}
+          >
+            导入 91 例 Excel
+          </button>
+        </div>
+        {importOpen && (
+          <CohortImportModal
+            onClose={() => setImportOpen(false)}
+            onImport={handleCohortImport}
+            hasData={cohortPatients.length > 0}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 min-h-0">
-      {/* 病例列表 */}
-      <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white">
-        <div className="border-b border-slate-100 px-3 py-3">
-          <p className="text-xs font-semibold text-slate-500">NACT 病例</p>
-          <button
-            onClick={loadDemoCase}
-            className="mt-2 w-full rounded-lg bg-gradient-to-r from-rose-500 to-violet-600 py-2 text-xs font-medium text-white hover:opacity-90"
-          >
-            加载演示病例
-          </button>
-          <button
-            onClick={() => {
-              const c = createEmptyCase();
-              setCases((prev) => [c, ...prev]);
-              setActiveId(c.id);
-              setPrediction(null);
-              setError(null);
-            }}
-            className="mt-2 w-full rounded-lg border border-dashed border-rose-200 py-2 text-xs text-rose-600 hover:bg-rose-50"
-          >
-            + 新建病例
-          </button>
-        </div>
-        <ul className="flex-1 overflow-y-auto scrollbar-thin p-2">
-          {cases.map((c) => (
-            <li key={c.id}>
-              <button
-                onClick={() => {
-                  setActiveId(c.id);
-                  setPrediction(null);
-                }}
-                className={`mb-1 w-full rounded-lg px-3 py-2.5 text-left text-xs ${
-                  c.id === activeId
-                    ? "bg-rose-50 font-medium text-rose-700 ring-1 ring-rose-200"
-                    : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                <p>{c.clinical.patientId}</p>
-                <p className="mt-0.5 text-[10px] text-slate-400">
-                  {c.clinical.figoStage} · {c.status === "done" ? "已分析" : "草稿"}
-                </p>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
+      <CohortSidebar
+        theme={theme}
+        cohortPatients={cohortPatients}
+        cohortSource={cohortSource}
+        cohortSearch={cohortSearch}
+        setCohortSearch={setCohortSearch}
+        filteredCohort={filteredCohort}
+        activeCohortId={activeCase.cohortRef?.id ?? null}
+        onImport={() => setImportOpen(true)}
+        onSelectCohort={openCohortForNact}
+        onLoadDemo={loadDemoCase}
+      />
 
       {/* 主工作区 */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-5 py-3">
-          <DiseaseIcon name="ovarian" size={22} color="#e11d48" />
+          <DiseaseIcon name="ovarian" size={22} color={theme.iconColor} />
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-semibold text-slate-900">卵巢癌 NACT 多模态预测</h2>
             <p className="text-xs text-slate-500">
-              临床 + 影像 PCI + 病理/分子 → 大模型辅助 MDT 决策
+              91 例队列驱动 · 临床 + 影像 PCI + 病理/分子 → AI 辅助决策
+              {cohortSource ? ` · ${cohortSource}` : ""}
             </p>
           </div>
-          <span className="hidden rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-medium text-violet-700 sm:inline">
+          <span className={`hidden rounded-full px-2.5 py-1 text-[10px] font-medium sm:inline ${theme.badgeClass}`}>
             AI Demo
           </span>
           <button
             onClick={handleAnalyze}
             disabled={analyzing}
-            className="rounded-lg bg-gradient-to-r from-rose-500 to-violet-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-50"
+            className={`rounded-lg ${theme.btnPrimaryClass} px-4 py-2 text-xs font-medium text-white disabled:opacity-50`}
           >
             {analyzing ? analyzeStage || "分析中…" : "运行 AI 多模态分析"}
           </button>
@@ -274,9 +348,7 @@ export function NactOvarianView() {
                   key={key}
                   onClick={() => setTab(key)}
                   className={`flex-1 py-2.5 text-xs ${
-                    tab === key
-                      ? "border-b-2 border-rose-500 font-medium text-rose-600"
-                      : "text-slate-500 hover:text-slate-700"
+                    tab === key ? theme.tabActiveClass : "text-slate-500 hover:text-slate-700"
                   }`}
                 >
                   {label}
@@ -289,7 +361,7 @@ export function NactOvarianView() {
                 <>
                   <Field label="病例 ID">
                     <input
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.clinical.patientId}
                       onChange={(e) =>
                         updateCase({ clinical: { ...activeCase.clinical, patientId: e.target.value } })
@@ -300,7 +372,7 @@ export function NactOvarianView() {
                     <Field label="年龄">
                       <input
                         type="number"
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                        className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                         value={activeCase.clinical.age ?? ""}
                         onChange={(e) =>
                           updateCase({
@@ -314,7 +386,7 @@ export function NactOvarianView() {
                     </Field>
                     <Field label="ECOG">
                       <select
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                        className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                         value={activeCase.clinical.ecog}
                         onChange={(e) =>
                           updateCase({
@@ -331,7 +403,7 @@ export function NactOvarianView() {
                   </div>
                   <Field label="FIGO 分期">
                     <select
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.clinical.figoStage}
                       onChange={(e) =>
                         updateCase({
@@ -346,7 +418,7 @@ export function NactOvarianView() {
                   </Field>
                   <Field label="组织学">
                     <input
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.clinical.histology}
                       onChange={(e) =>
                         updateCase({
@@ -359,7 +431,7 @@ export function NactOvarianView() {
                     <Field label="CA125 基线 (U/mL)">
                       <input
                         type="number"
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                        className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                         value={activeCase.clinical.ca125Baseline ?? ""}
                         onChange={(e) =>
                           updateCase({
@@ -374,7 +446,7 @@ export function NactOvarianView() {
                     <Field label="CA125 中期 (U/mL)">
                       <input
                         type="number"
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                        className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                         value={activeCase.clinical.ca125Mid ?? ""}
                         onChange={(e) =>
                           updateCase({
@@ -392,7 +464,7 @@ export function NactOvarianView() {
                   )}
                   <Field label="NACT 方案">
                     <input
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.clinical.nactRegimen}
                       onChange={(e) =>
                         updateCase({
@@ -405,7 +477,7 @@ export function NactOvarianView() {
                     <Field label="已完成周期">
                       <input
                         type="number"
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                        className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                         value={activeCase.clinical.nactCyclesDone}
                         onChange={(e) =>
                           updateCase({
@@ -420,7 +492,7 @@ export function NactOvarianView() {
                     <Field label="计划周期">
                       <input
                         type="number"
-                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                        className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                         value={activeCase.clinical.nactCyclesPlanned}
                         onChange={(e) =>
                           updateCase({
@@ -456,7 +528,7 @@ export function NactOvarianView() {
                     <div className="mt-3 flex gap-2">
                       <Link
                         href="/imaging"
-                        className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs text-white hover:bg-rose-700"
+                        className={`rounded-lg px-3 py-1.5 text-xs text-white ${theme.btnSolidClass}`}
                       >
                         前往影像分析
                       </Link>
@@ -475,7 +547,7 @@ export function NactOvarianView() {
                 <>
                   <Field label="分级">
                     <select
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.pathology.grade}
                       onChange={(e) =>
                         updateCase({
@@ -490,7 +562,7 @@ export function NactOvarianView() {
                   </Field>
                   <Field label="p53">
                     <select
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.pathology.p53}
                       onChange={(e) =>
                         updateCase({
@@ -505,7 +577,7 @@ export function NactOvarianView() {
                   </Field>
                   <Field label="WT1">
                     <select
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.pathology.wt1}
                       onChange={(e) =>
                         updateCase({
@@ -520,7 +592,7 @@ export function NactOvarianView() {
                   <Field label="Ki67 (%)">
                     <input
                       type="number"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.pathology.ki67 ?? ""}
                       onChange={(e) =>
                         updateCase({
@@ -539,7 +611,7 @@ export function NactOvarianView() {
                 <>
                   <Field label="HRD 状态">
                     <select
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.molecular.hrdStatus}
                       onChange={(e) =>
                         updateCase({
@@ -557,7 +629,7 @@ export function NactOvarianView() {
                   </Field>
                   <Field label="BRCA">
                     <select
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.molecular.brca}
                       onChange={(e) =>
                         updateCase({
@@ -576,7 +648,7 @@ export function NactOvarianView() {
                   <Field label="HRD 评分">
                     <input
                       type="number"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-rose-400"
+                      className={`w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${inputRing}`}
                       value={activeCase.molecular.hrdScore ?? ""}
                       onChange={(e) =>
                         updateCase({
@@ -606,7 +678,7 @@ export function NactOvarianView() {
                 {!analyzing && (
                   <button
                     onClick={loadDemoCase}
-                    className="mt-4 rounded-lg border border-violet-200 bg-white px-4 py-2 text-xs text-violet-700 hover:bg-violet-50"
+                    className={`mt-4 rounded-lg ${theme.outlineBtnClass}`}
                   >
                     快速加载演示病例 →
                   </button>
@@ -617,8 +689,7 @@ export function NactOvarianView() {
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${
-                      prediction.source === "llm"
-                        ? "bg-violet-100 text-violet-700"
+                      prediction.source === "llm" ? theme.badgeClass
                         : "bg-slate-200 text-slate-600"
                     }`}
                   >
@@ -645,8 +716,8 @@ export function NactOvarianView() {
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
                   <p className="text-xs font-semibold text-slate-700">四模态贡献度</p>
                   <div className="mt-3 space-y-3">
-                    <ScoreBar label="临床" value={prediction.modalityScores.clinical} color="bg-rose-500" />
-                    <ScoreBar label="影像 (PCI)" value={prediction.modalityScores.imaging} color="bg-violet-500" />
+                    <ScoreBar label="临床" value={prediction.modalityScores.clinical} color={theme.accentSolidClass} />
+                    <ScoreBar label="影像 (PCI)" value={prediction.modalityScores.imaging} color="bg-teal-500" />
                     <ScoreBar label="病理" value={prediction.modalityScores.pathology} color="bg-blue-500" />
                     <ScoreBar label="分子" value={prediction.modalityScores.molecular} color="bg-emerald-500" />
                   </div>
@@ -658,9 +729,29 @@ export function NactOvarianView() {
                 </div>
 
                 {prediction.reasoning && (
-                  <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4">
-                    <p className="text-xs font-semibold text-violet-900">AI 推理过程</p>
-                    <p className="mt-2 text-sm leading-relaxed text-violet-950">{prediction.reasoning}</p>
+                  <div className={`rounded-xl p-4 ${theme.aiPanelClass}`}>
+                    <p className={`text-xs font-semibold ${theme.aiPanelTitleClass}`}>AI 推理过程</p>
+                    <p className={`mt-2 text-sm leading-relaxed ${theme.aiPanelTextClass}`}>{prediction.reasoning}</p>
+                  </div>
+                )}
+
+                {activeCase.cohortRef?.outcomes && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-semibold text-slate-700">队列真实标签（用于模型验证）</p>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2 text-xs">
+                      {activeCase.cohortRef.outcomes.nact_response && (
+                        <p>
+                          <span className="text-slate-500">NACT 反应：</span>
+                          {activeCase.cohortRef.outcomes.nact_response}
+                        </p>
+                      )}
+                      {activeCase.cohortRef.outcomes.r0 && (
+                        <p>
+                          <span className="text-slate-500">减瘤/R0：</span>
+                          {activeCase.cohortRef.outcomes.r0}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -708,7 +799,93 @@ export function NactOvarianView() {
           </div>
         </div>
       </div>
+
+      {importOpen && (
+        <CohortImportModal
+          onClose={() => setImportOpen(false)}
+          onImport={handleCohortImport}
+          hasData={cohortPatients.length > 0}
+        />
+      )}
     </div>
+  );
+}
+
+function CohortSidebar({
+  theme,
+  cohortPatients,
+  cohortSource,
+  cohortSearch,
+  setCohortSearch,
+  filteredCohort,
+  activeCohortId,
+  onImport,
+  onSelectCohort,
+  onLoadDemo,
+}: {
+  theme: EditionTheme;
+  cohortPatients: CohortPatient[];
+  cohortSource: string | null;
+  cohortSearch: string;
+  setCohortSearch: (v: string) => void;
+  filteredCohort: CohortPatient[];
+  activeCohortId: string | null;
+  onImport: () => void;
+  onSelectCohort: (p: CohortPatient) => void;
+  onLoadDemo: () => void;
+}) {
+  return (
+    <aside className="flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
+      <div className="border-b border-slate-100 px-3 py-3">
+        <p className="text-xs font-semibold text-slate-500">91 例队列</p>
+        <button
+          onClick={onImport}
+          className={`mt-2 w-full rounded-lg ${theme.btnPrimaryClass} py-2 text-xs font-medium text-white hover:opacity-90`}
+        >
+          导入 Excel
+        </button>
+        {cohortSource && (
+          <p className="mt-1.5 truncate text-[10px] text-slate-400">{cohortPatients.length} 例 · {cohortSource}</p>
+        )}
+        <input
+          value={cohortSearch}
+          onChange={(e) => setCohortSearch(e.target.value)}
+          placeholder="搜索队列…"
+          className={`mt-2 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-[11px] focus:outline-none focus:ring-1 ${theme.inputFocusRingClass}`}
+        />
+        <button
+          onClick={onLoadDemo}
+          className="mt-2 w-full rounded-lg border border-dashed border-slate-200 py-1.5 text-[10px] text-slate-500 hover:bg-slate-50"
+        >
+          加载演示病例
+        </button>
+      </div>
+      <ul className="flex-1 overflow-y-auto scrollbar-thin p-2">
+        {filteredCohort.length === 0 ? (
+          <li className="px-2 py-4 text-center text-[10px] text-slate-400">
+            {cohortPatients.length === 0 ? "请导入老师提供的 Excel" : "无匹配病例"}
+          </li>
+        ) : (
+          filteredCohort.map((p) => (
+            <li key={p.id}>
+              <button
+                onClick={() => onSelectCohort(p)}
+                className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-xs ${
+                  activeCohortId === p.id
+                    ? theme.selectedItemClass
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <p className="truncate">{cohortDisplayName(p)}</p>
+                <p className="mt-0.5 text-[10px] text-slate-400">
+                  {[p.figo, p.nact_response].filter(Boolean).join(" · ") || `行 ${p.sourceRow ?? "?"}`}
+                </p>
+              </button>
+            </li>
+          ))
+        )}
+      </ul>
+    </aside>
   );
 }
 

@@ -1,0 +1,47 @@
+<view class="page" wx:if="{{visit}}">
+  <view class="steps">
+    <text wx:for="{{steps}}" wx:key="id" class="step {{index <= stepIndex ? 'on' : ''}}">{{index+1}}.{{item.label}}</text>
+  </view>
+
+  <view wx:if="{{stepIndex === 0}}" class="card">
+    <input placeholder="姓名" value="{{visit.registration.patientName}}" data-key="patientName" bindinput="setReg" />
+    <input placeholder="年龄" type="number" value="{{visit.registration.age}}" data-key="age" bindinput="setReg" />
+    <input placeholder="主诉" value="{{visit.registration.chiefComplaint}}" data-key="chiefComplaint" bindinput="setReg" />
+  </view>
+
+  <view wx:if="{{stepIndex === 1}}" class="card">
+    <textarea placeholder="主要症状" value="{{visit.preconsult.symptoms}}" data-key="symptoms" bindinput="setPre" />
+    <textarea placeholder="既往史" value="{{visit.preconsult.history}}" data-key="history" bindinput="setPre" />
+  </view>
+
+  <view wx:if="{{stepIndex === 2}}" class="card">
+    <view wx:for="{{bloodFields}}" wx:key="*this">
+      <input placeholder="{{item}}" value="{{visit.labs.blood[item]}}" data-key="{{item}}" bindinput="setLab" data-section="blood" />
+    </view>
+  </view>
+
+  <view wx:if="{{stepIndex === 3}}" class="card">
+    <text class="tip">完整 DICOM ZIP 请在 Web 端上传；此处可填影像结论</text>
+    <textarea placeholder="影像/PCI 摘要" bindinput="onImagingNote" />
+  </view>
+
+  <view wx:if="{{stepIndex === 4}}" class="card">
+    <view wx:for="{{guidelines}}" wx:key="*this">
+      <button size="mini" data-item="{{item}}" bindtap="toggleGuide">{{item}}</button>
+    </view>
+  </view>
+
+  <view wx:if="{{stepIndex === 5}}" class="card">
+    <block wx:if="{{visit.aiDiagnosis}}">
+      <text class="ai-title">{{visit.aiDiagnosis.summary}}</text>
+      <text class="ai-sub">紧急：{{visit.aiDiagnosis.urgency}}</text>
+    </block>
+    <button wx:else class="btn primary" loading="{{aiBusy}}" bindtap="runAi">运行 AI 辅助诊断</button>
+  </view>
+
+  <view class="footer">
+    <button bindtap="prevStep" disabled="{{stepIndex === 0}}">上一步</button>
+    <button class="primary" bindtap="nextStep" wx:if="{{stepIndex < 4}}">下一步</button>
+    <button class="primary" bindtap="runAi" wx:if="{{stepIndex === 4}}">AI 诊断</button>
+  </view>
+</view>

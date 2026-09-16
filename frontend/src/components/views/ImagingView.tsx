@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { IconLoader } from "@/components/IconFont";
+import { useEditionTheme } from "@/hooks/useEditionTheme";
+import type { EditionTheme } from "@/lib/agent-editions";
 import {
   blendMaskOverlay,
   downloadBlob,
@@ -20,11 +22,13 @@ function scoreBadgeClass(score: number) {
 }
 
 function UploadPanel({
+  theme,
   onAnalyze,
   loading,
   apiOnline,
   progress,
 }: {
+  theme: EditionTheme;
   onAnalyze: (file: File) => void;
   loading: boolean;
   apiOnline: boolean | null;
@@ -85,8 +89,8 @@ function UploadPanel({
         onClick={() => inputRef.current?.click()}
         className={`mt-8 flex w-full cursor-pointer flex-col items-center rounded-2xl border-2 border-dashed px-8 py-14 transition-colors ${
           dragOver
-            ? "border-rose-400 bg-rose-50/50"
-            : "border-slate-200 bg-white hover:border-rose-300 hover:bg-slate-50"
+            ? theme.dropZoneActiveClass
+            : `border-slate-200 bg-white ${theme.dropZoneHoverClass} hover:bg-slate-50`
         }`}
       >
         <input
@@ -98,7 +102,9 @@ function UploadPanel({
         />
         {loading ? (
           <div className="flex flex-col items-center gap-3 text-slate-500">
-            <IconLoader size={28} className="animate-spin text-rose-500" />
+            <span className={theme.loaderClass}>
+              <IconLoader size={28} />
+            </span>
             <p className="text-sm">{progress?.message ?? "正在处理，请稍候…"}</p>
             <p className="text-xs text-slate-400">
               {progress
@@ -109,7 +115,7 @@ function UploadPanel({
           </div>
         ) : (
           <>
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+            <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${theme.uploadIconBgClass}`}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
               </svg>
@@ -129,9 +135,11 @@ function UploadPanel({
 type ViewMode = "overlay" | "mask" | "blend";
 
 function ViewerPanel({
+  theme,
   result,
   onReset,
 }: {
+  theme: EditionTheme;
   result: ImagingAnalysisResult;
   onReset: () => void;
 }) {
@@ -261,9 +269,7 @@ function ViewerPanel({
                 key={mode}
                 onClick={() => setViewMode(mode)}
                 className={`rounded-md px-2.5 py-1 text-xs ${
-                  viewMode === mode
-                    ? "bg-rose-50 font-medium text-rose-700"
-                    : "text-slate-500 hover:text-slate-700"
+                  viewMode === mode ? theme.selectedItemClass : "text-slate-500 hover:text-slate-700"
                 }`}
               >
                 {label}
@@ -311,7 +317,9 @@ function ViewerPanel({
         <div className="relative flex flex-1 items-center justify-center bg-[#1a1a1a] p-4">
           {maskLoading && viewMode !== "overlay" && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30">
-              <IconLoader size={24} className="animate-spin text-white" />
+              <span className="animate-spin text-white">
+                <IconLoader size={24} />
+              </span>
             </div>
           )}
           {displayImage ? (
@@ -350,7 +358,7 @@ function ViewerPanel({
             {result.totalPciScore != null && (
               <p className="mt-1 text-xs text-slate-500">
                 PCI 总分：
-                <span className="font-semibold text-rose-600">{result.totalPciScore}</span>
+                <span className={`font-semibold ${theme.accentTextClass}`}>{result.totalPciScore}</span>
               </p>
             )}
             {result.positiveRate != null && (
@@ -407,6 +415,7 @@ function ViewerPanel({
 
 /** 影像数据标注与 PCI 病理分级 */
 export function ImagingView() {
+  const theme = useEditionTheme();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImagingAnalysisResult | null>(null);
@@ -456,14 +465,14 @@ export function ImagingView() {
             {error}
           </div>
         )}
-        <ViewerPanel result={result} onReset={() => { setResult(null); setError(null); }} />
+        <ViewerPanel theme={theme} result={result} onReset={() => { setResult(null); setError(null); }} />
       </div>
     );
   }
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <UploadPanel onAnalyze={handleAnalyze} loading={loading} apiOnline={apiOnline} progress={progress} />
+      <UploadPanel theme={theme} onAnalyze={handleAnalyze} loading={loading} apiOnline={apiOnline} progress={progress} />
       {error && (
         <p className="mx-auto -mt-8 mb-8 max-w-lg rounded-lg bg-red-50 px-4 py-2 text-center text-xs text-red-700">
           {error}
